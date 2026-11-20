@@ -1,0 +1,70 @@
+# ZemaxConsole 0.2 小 F 数单片镜测试
+# 使用：复制本文件全部内容到左侧代码框，按 F5 运行。
+# 分段测试：先“停止并重置”，再按顺序将光标放入各段并按 F7。
+# 不要重复执行建模段，否则会继续添加透镜。
+# 本文件为程序功能与光学初始结构测试，不是已优化的成像设计。
+# 单位 mm；物体在无穷远；轴上；工作波长 0.5876 um。
+# 导出后在 Zemax 新建空白序列系统中运行宏。
+# Zemax 需手动设置：系统孔径类型为入瞳直径，入瞳直径 25 mm；
+# 视场为轴上 0 度；波长 0.5876 um；单位 mm；材料目录包含 N-BK7。
+# 本程序只设置曲面半口径，不会自动设置系统入瞳、波长或视场。
+# 近轴 F 数约 1.59，球差预计明显；像面距离是近轴后焦距，不是最佳像面。
+
+# %% 第1段 参数与近轴计算
+r1 = 40.0
+r2 = -40.0
+center_thickness = 6.0
+lens_diameter = 28.0
+entrance_pupil = 25.0
+glass_name = "N-BK7"
+n_d = 1.51680  # N-BK7 在 d 线附近的折射率，用于近轴估算
+
+# 空气中厚透镜光焦度，以及从后表面测量的近轴后焦距
+power = (n_d - 1.0) * (
+    1.0 / r1 - 1.0 / r2
+    + (n_d - 1.0) * center_thickness / (n_d * r1 * r2)
+)
+efl = 1.0 / power
+bfl = efl * (1.0 - (n_d - 1.0) * center_thickness / (n_d * r1))
+f_number = efl / entrance_pupil
+semi = lens_diameter / 2.0
+sag1 = r1 - math.sqrt(r1 * r1 - semi * semi)
+sag2 = -(abs(r2) - math.sqrt(r2 * r2 - semi * semi))
+edge_thickness = center_thickness + sag2 - sag1
+assert edge_thickness > 0, "透镜边缘相交，请增加中心厚度或减小直径"
+print("参数已准备，可继续执行第2段。")
+print(f"近轴有效焦距：{efl:.4f} mm")
+print(f"近轴后焦距：{bfl:.4f} mm")
+print(f"入瞳直径：{entrance_pupil:.2f} mm；近轴 F 数：F/{f_number:.3f}")
+print(f"透镜几何直径：{lens_diameter:.2f} mm；边缘厚度：{edge_thickness:.4f} mm")
+
+# %% 第2段 创建单片双凸透镜
+surface_ids = add_lens(
+    radius1=r1,
+    radius2=r2,
+    thickness=center_thickness,
+    diameter=lens_diameter,
+    glass=glass_name,
+)
+add_space(bfl)
+print(f"已创建两个折射面：{surface_ids}")
+print("建模完成，可查看 ZPL 预览并导出。")
+
+# %% 第3段 输出与跨段变量测试
+print("=== 小 F 数单片镜测试结果 ===")
+print(f"R1={r1:.3f}，R2={r2:.3f}，中心厚度={center_thickness:.3f} mm")
+print(f"后表面至像面={bfl:.4f} mm，材料={glass_name}")
+print(f"目标验证：Zemax 近轴焦距约 {efl:.2f} mm，F 数约 {f_number:.2f}。")
+print("请在 Zemax 查看布局、光线扇图或点列图；本输出不代表已完成光线追迹。")
+
+# %% 第4段 可选报错与选中纠错测试 默认关闭
+# 将下一行改为 True 后运行本段，会先输出文字，再故意触发除零异常。
+# 鼠标选中 if 块，点击“选中纠错”，可要求助手修复除零并保留提示输出。
+# 测试完成后改回 False，按 F5 重建模型后再导出。
+enable_error_test = False
+if enable_error_test:
+    print("这是报错前的输出，应当保留在输出与报错面板中。")
+    test_value = 1 / 0
+    print(test_value)
+
+# 折射率参考：https://media.schott.com/api/public/content/41e799d0bf874807a0bb8e702fbb75b5?v=54856406
